@@ -1,0 +1,49 @@
+# Python env and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+env/
+venv/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Node dependencies
+node_modules/
+jspm_packages/
+dist/
+tmp/
+out/
+build/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.eslintcache
+
+# IDEs & System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Output audio and logs
+*.wav
+*.mp3
+*.log
+usage_log.json
+data/
+backend/data/
