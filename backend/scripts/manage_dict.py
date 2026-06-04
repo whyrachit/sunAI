@@ -3,20 +3,21 @@
 Pronunciation dictionary manager — CLI wrapper around SarvamTTS dict methods.
 
 Usage:
-    python manage_dict.py create --file my_terms.json
-    python manage_dict.py list
-    python manage_dict.py show --id p_abc123
-    python manage_dict.py delete --id p_abc123
-    python manage_dict.py template
+    python backend/scripts/manage_dict.py create --file my_terms.json
+    python backend/scripts/manage_dict.py list
+    python backend/scripts/manage_dict.py show --id p_abc123
+    python backend/scripts/manage_dict.py delete --id p_abc123
+    python backend/scripts/manage_dict.py template
 """
 
 import sys
 import pathlib
 
-# Ensure the sunAI codebase directory takes priority on the python path
-_sunai_dir = pathlib.Path(__file__).parent.resolve()
-if str(_sunai_dir) not in sys.path:
-    sys.path.insert(0, str(_sunai_dir))
+# Ensure the backend directory takes priority on the python path
+_script_dir = pathlib.Path(__file__).parent.resolve()
+_backend_dir = _script_dir.parent.resolve()
+if str(_backend_dir) not in sys.path:
+    sys.path.insert(0, str(_backend_dir))
 
 import argparse
 import json

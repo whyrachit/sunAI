@@ -4,18 +4,19 @@ E-Learning Document to Audio Converter
 Uses Sarvam AI bulbul:v3 TTS.
 
 Usage:
-    python convert.py lecture.txt -l en -o lesson1.mp3
-    python convert.py course.docx -l hi --pace 0.85 --temperature 0.4
-    python convert.py script.txt -l en --stream -o output.mp3
+    python backend/scripts/convert.py lecture.txt -l en -o lesson1.mp3
+    python backend/scripts/convert.py course.docx -l hi --pace 0.85 --temperature 0.4
+    python backend/scripts/convert.py script.txt -l en --stream -o output.mp3
 """
 
 import sys
 import pathlib
 
-# Ensure the sunAI codebase directory takes priority on the python path
-_sunai_dir = pathlib.Path(__file__).parent.resolve()
-if str(_sunai_dir) not in sys.path:
-    sys.path.insert(0, str(_sunai_dir))
+# Ensure the backend directory takes priority on the python path
+_script_dir = pathlib.Path(__file__).parent.resolve()
+_backend_dir = _script_dir.parent.resolve()
+if str(_backend_dir) not in sys.path:
+    sys.path.insert(0, str(_backend_dir))
 
 import argparse
 import os
@@ -159,7 +160,6 @@ def main():
             try:
                 audio = tts.convert(
                     text=chunk, language_code=language_code, speaker=speaker,
-                    pace=args.pace, temperature=args.temperature,
                     sample_rate=args.sample_rate, output_audio_codec="mp3",
                     dict_id=args.dict_id,
                 )
@@ -188,10 +188,10 @@ def _epilog() -> str:
 Languages: {langs}
 
 Examples:
-  python convert.py lecture.txt -l en -o lesson.mp3
-  python convert.py hindi.docx -l hi -v female --pace 0.9
-  python convert.py script.srt -l en --stream --temperature 0.8
-  python convert.py chapter.txt -l en --dict-id p_abc123
+  python backend/scripts/convert.py lecture.txt -l en -o lesson.mp3
+  python backend/scripts/convert.py hindi.docx -l hi -v female --pace 0.9
+  python backend/scripts/convert.py script.srt -l en --stream --temperature 0.8
+  python backend/scripts/convert.py chapter.txt -l en --dict-id p_abc123
 """
 
 

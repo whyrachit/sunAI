@@ -144,6 +144,10 @@ async def api_login(req: LoginRequest):
     if not req.username.strip() or not req.apiKey.strip():
         raise HTTPException(status_code=400, detail="Username and API key are required.")
 
+    # Support dummy API key for demo experience
+    if req.apiKey.strip() == "sk_demo_only":
+        return {"success": True, "message": "Demo login validated successfully."}
+
     # Validate against Sarvam endpoint by listing dicts (acts as a credentials verify ping)
     tts = SarvamTTS(req.apiKey)
     try:
@@ -157,6 +161,11 @@ async def api_login(req: LoginRequest):
 @app.post("/api/clean-script")
 async def api_clean_script(req: ScriptCleanRequest):
     """Clean and polish script/SRT file using Sarvam 105B LLM."""
+    if req.apiKey.strip() == "sk_demo_only":
+        raise HTTPException(
+            status_code=403,
+            detail="Demo Mode: Script cleaning is disabled. Please configure a valid Sarvam API key to use this feature."
+        )
     try:
         username = os.getenv("APP_USERNAME", "ATC")
         if req.preserveSrt:
@@ -199,6 +208,11 @@ async def api_clean_script(req: ScriptCleanRequest):
 @app.post("/api/convert-speech")
 async def api_convert_speech(req: SpeechRequest):
     """Convert text script chunk-by-chunk to high-fidelity audio tracks."""
+    if req.apiKey.strip() == "sk_demo_only":
+        raise HTTPException(
+            status_code=403,
+            detail="Demo Mode: Voice generation is disabled. Please configure a valid Sarvam API key to use this feature."
+        )
     dict_id = req.dictId
 
     # Resolve speaker codes from labels
@@ -321,6 +335,11 @@ async def api_convert_speech(req: SpeechRequest):
 @app.post("/api/run-pipeline")
 async def api_run_pipeline(req: PipelineRequest):
     """End-to-end pipeline: optimizes the raw text via LLM, then synthesizes audio for all speakers."""
+    if req.apiKey.strip() == "sk_demo_only":
+        raise HTTPException(
+            status_code=403,
+            detail="Demo Mode: Pipeline run is disabled. Please configure a valid Sarvam API key to use this feature."
+        )
     username = os.getenv("APP_USERNAME", "ATC")
     # Step 1: Script optimization
     try:
@@ -498,6 +517,11 @@ async def api_update_dict_id(req: UpdateDictIdRequest):
 @app.post("/api/dictionary/upload")
 async def api_upload_dictionary(req: DictionaryUploadRequest):
     """Upload saved pronunciation dictionary entries to the Sarvam AI cloud (Stateless)."""
+    if req.apiKey.strip() == "sk_demo_only":
+        raise HTTPException(
+            status_code=403,
+            detail="Demo Mode: Dictionary upload to Sarvam Cloud is disabled. Please configure a valid Sarvam API key."
+        )
     entries = [e.dict() for e in req.entries]
     if not entries:
         raise HTTPException(status_code=400, detail="No pronunciation dictionary entries found to upload.")
