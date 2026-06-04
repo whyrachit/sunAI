@@ -88,6 +88,16 @@ npm install
 
 Open `http://localhost:5173` in your browser, log in with your API Key, and let Maskali take flight!
 
+### 3. Using the CLI scripts
+You can run the script tools directly from the `backend` environment:
+```bash
+# Convert a file directly to audio
+python backend/scripts/convert.py lecture.txt -l en -o output.mp3
+
+# Manage pronunciation dictionary
+python backend/scripts/manage_dict.py list
+```
+
 ---
 
 *Made with 🕊️ and code-mixed love. Coo coo!*

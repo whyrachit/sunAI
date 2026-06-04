@@ -47,3 +47,5 @@ desktop.ini
 usage_log.json
 data/
 backend/data/
+
+.vercel
