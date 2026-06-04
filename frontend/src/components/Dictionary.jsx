@@ -194,7 +194,7 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
 
     setSyncing(true)
     try {
-      const response = await axios.post('http://localhost:8000/api/dictionary/upload', {
+      const response = await axios.post('/api/dictionary/upload', {
         apiKey: apiKey,
         entries: entries,
         workspace: workspace
@@ -303,7 +303,7 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
             {sarvamDictId ? (
               <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 border border-emerald-300 px-1.5 py-0.5">ACTIVE PROFILE</span>
             ) : (
-              <span className="text-[8px] font-black text-amber-600 bg-amber-50 border border-amber-300 px-1.5 py-0.5">LOCAL ONLY</span>
+              <span className="text-[8px] font-black text-amber-600 bg-amber-50 border border-amber-300 px-1.5 py-0.5">NO CONFIG YET</span>
             )}
           </div>
           

@@ -80,7 +80,7 @@ export default function ScriptEditor({ apiKey, onSendToConverter, workspace, sho
     formData.append('file', file)
 
     try {
-      const response = await axios.post('http://localhost:8000/api/parse-file', formData, {
+      const response = await axios.post('/api/parse-file', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -116,7 +116,7 @@ export default function ScriptEditor({ apiKey, onSendToConverter, workspace, sho
     }
 
     try {
-      const response = await axios.post('http://localhost:8000/api/clean-script', {
+      const response = await axios.post('/api/clean-script', {
         apiKey: apiKey,
         text: inputText,
         targetLang: targetLang,

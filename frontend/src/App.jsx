@@ -201,24 +201,27 @@ export default function App() {
             <div className="fixed inset-0 bg-black/45 backdrop-blur-xs z-50 flex items-center justify-center p-4">
               <div className="bg-white border-2 border-black max-w-md w-full p-6 relative flex flex-col justify-between min-h-[380px] shadow-[4px_4px_0px_0px_var(--accent-green)]">
                 
-                {/* Close/Skip Button */}
-                <button 
-                  onClick={handleDismissIntro}
-                  className="absolute top-3 right-3 text-[10px] font-bold border border-black px-2 py-0.5 hover:bg-zinc-100 uppercase"
-                >
-                  Skip Tour
-                </button>
+                {/* Header Row: Prevents Skip Tour and Progress Bar from clashing */}
+                <div className="flex items-center justify-between gap-4 mt-1 mb-5">
+                  {/* Progress Stepper indicator */}
+                  <div className="flex items-center gap-1.5 flex-1 max-w-[200px]">
+                    {[0, 1, 2, 3, 4].map((stepIdx) => (
+                      <div 
+                        key={stepIdx} 
+                        className={`h-1.5 flex-1 transition-all duration-300 ${
+                          stepIdx <= introStep ? 'bg-black' : 'bg-zinc-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
 
-                {/* Progress Stepper indicator */}
-                <div className="flex items-center gap-1.5 mt-2 mb-4">
-                  {[0, 1, 2, 3, 4].map((stepIdx) => (
-                    <div 
-                      key={stepIdx} 
-                      className={`h-1.5 flex-1 transition-all duration-300 ${
-                        stepIdx <= introStep ? 'bg-black' : 'bg-zinc-200'
-                      }`}
-                    />
-                  ))}
+                  {/* Close/Skip Button */}
+                  <button 
+                    onClick={handleDismissIntro}
+                    className="text-[9px] font-black border border-black px-2.5 py-1 hover:bg-zinc-100 uppercase shrink-0"
+                  >
+                    Skip Tour
+                  </button>
                 </div>
 
                 {/* Step Content */}

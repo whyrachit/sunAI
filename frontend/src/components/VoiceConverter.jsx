@@ -303,7 +303,7 @@ export default function VoiceConverter({ apiKey, pendingText, workspace, showToa
     setPrevAudioUrl('')
 
     try {
-      const response = await axios.post('http://localhost:8000/api/convert-speech', {
+      const response = await axios.post('/api/convert-speech', {
         apiKey: apiKey,
         text: prevText,
         filename: 'preview.txt',
@@ -359,7 +359,7 @@ export default function VoiceConverter({ apiKey, pendingText, workspace, showToa
     formData.append('file', file)
 
     try {
-      const response = await axios.post('http://localhost:8000/api/parse-file', formData, {
+      const response = await axios.post('/api/parse-file', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -388,7 +388,7 @@ export default function VoiceConverter({ apiKey, pendingText, workspace, showToa
     setProgressMsg('Synthesizing audio tracks')
 
     try {
-      const response = await axios.post('http://localhost:8000/api/convert-speech', {
+      const response = await axios.post('/api/convert-speech', {
         apiKey: apiKey,
         text: inputText,
         filename: fileName || 'script.txt',

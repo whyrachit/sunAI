@@ -273,7 +273,7 @@ export default function CompletePipeline({ apiKey, workspace, showToast }) {
     formData.append('file', file)
 
     try {
-      const response = await axios.post('http://localhost:8000/api/parse-file', formData, {
+      const response = await axios.post('/api/parse-file', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -324,7 +324,7 @@ export default function CompletePipeline({ apiKey, workspace, showToast }) {
     }
 
     try {
-      const response = await axios.post('http://localhost:8000/api/run-pipeline', {
+      const response = await axios.post('/api/run-pipeline', {
         apiKey: apiKey,
         text: inputText,
         filename: fileName || 'script.txt',

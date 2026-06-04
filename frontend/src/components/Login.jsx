@@ -9,6 +9,7 @@ export default function Login({ onLoginSuccess }) {
   
   // Toggle between Maskali Story and Setup Guide on left panel
   const [showGuide, setShowGuide] = useState(false)
+  const [showMobileGuide, setShowMobileGuide] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -21,7 +22,7 @@ export default function Login({ onLoginSuccess }) {
     setError('')
 
     try {
-      const response = await axios.post('http://localhost:8000/api/login', {
+      const response = await axios.post('/api/login', {
         username: username,
         apiKey: apiKey
       })
@@ -43,7 +44,7 @@ export default function Login({ onLoginSuccess }) {
   }
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex flex-col md:flex-row bg-[#fbfbfa] relative select-none">
+    <div className="w-screen h-[100dvh] overflow-hidden flex flex-col md:flex-row bg-[#fbfbfa] relative select-none">
       
       {/* Subtle Geometric background line grid */}
       <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
@@ -68,8 +69,8 @@ export default function Login({ onLoginSuccess }) {
         <div className="absolute inset-8 border border-black/[0.04]" />
       </div>
 
-      {/* LEFT PANEL: 3D Flip Card Container (40% width) */}
-      <div className="w-full md:w-[40%] h-1/2 md:h-full border-b border-black/10 md:border-b-0 md:border-r border-black/10 z-10 relative select-none perspective-container">
+      {/* LEFT PANEL: 3D Flip Card Container (40% width) - Hidden on Mobile */}
+      <div className="hidden md:block md:w-[40%] h-full border-r border-black/10 z-10 relative select-none perspective-container">
         <div className={`flip-card-inner ${showGuide ? 'flipped' : ''}`}>
           
           {/* FRONT SIDE: Maskali Story */}
@@ -207,6 +208,9 @@ export default function Login({ onLoginSuccess }) {
             </div>
 
             <div className="pt-4 border-t border-[#1a1a1d] shrink-0">
+              <div className="mb-3 p-2 bg-amber-50 border border-amber-600/30 text-[9px] text-amber-800 font-bold uppercase tracking-wider leading-relaxed">
+                ⚡ Demo Option: Use API key <span className="font-black text-black underline">sk_demo_only</span> to instantly log in and explore the studio UI without account setup.
+              </div>
               <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Go back to branding?</p>
               <button
                 onClick={() => setShowGuide(false)}
@@ -220,21 +224,34 @@ export default function Login({ onLoginSuccess }) {
         </div>
       </div>
 
-      {/* RIGHT PANEL: Unscrollable Login form card (60% width) */}
-      <div className="w-full md:w-[60%] h-1/2 md:h-full p-8 md:p-12 z-10 flex flex-col justify-center items-center relative">
+      {/* RIGHT PANEL: Centered Login Form - Occupies Full Screen on Mobile */}
+      <div className="w-full md:w-[60%] h-full p-6 md:p-12 z-10 flex flex-col justify-center items-center relative">
         
-        <div className="bg-white border border-black p-8 premium-card max-w-md w-full select-none shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[5px_5px_0px_0px_var(--accent-red)] transition-all duration-300">
+        {/* Mobile Header Branding */}
+        <div className="md:hidden flex flex-col items-center mb-6 select-none">
+          <div className="w-10 h-10 bg-black text-white flex items-center justify-center font-black text-xl shadow-[2.5px_2.5px_0px_0px_var(--accent-red)] border border-black mb-3 brand-crest">
+            M
+          </div>
+          <h1 className="text-3xl font-black text-[#0c0c0e] tracking-tighter leading-none">
+            <span className="lowercase">sun</span><span className="text-[var(--accent-green)] uppercase">AI</span>
+          </h1>
+          <p className="text-[8px] font-bold text-zinc-400 mt-1.5 tracking-widest uppercase">
+            Conversational Voice Studio
+          </p>
+        </div>
+
+        <div className="bg-white border border-black p-6 md:p-8 premium-card max-w-md w-full select-none shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[5px_5px_0px_0px_var(--accent-red)] transition-all duration-300">
           
-          <h3 className="text-sm font-bold text-center text-[#0c0c0e] mb-2 select-none tracking-widest uppercase">
+          <h3 className="text-xs md:text-sm font-bold text-center text-[#0c0c0e] mb-2 tracking-widest uppercase">
             Enter Workspace
           </h3>
-          <p className="text-[9px] text-zinc-400 text-center mb-6 select-none font-bold tracking-wider uppercase">
+          <p className="text-[9px] text-zinc-400 text-center mb-6 font-bold tracking-wider uppercase">
             Grounded in local languages. Rooted in intelligence.
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
             <div>
-              <label className="block text-[9px] font-bold text-zinc-500 tracking-widest mb-1.5 select-none uppercase">
+              <label className="block text-[9px] font-bold text-zinc-500 tracking-widest mb-1.5 uppercase">
                 Username
               </label>
               <input
@@ -248,7 +265,7 @@ export default function Login({ onLoginSuccess }) {
             </div>
 
             <div>
-              <label className="block text-[9px] font-bold text-zinc-500 tracking-widest mb-1.5 select-none uppercase">
+              <label className="block text-[9px] font-bold text-zinc-500 tracking-widest mb-1.5 uppercase">
                 Sarvam API Key
               </label>
               <input
@@ -259,20 +276,30 @@ export default function Login({ onLoginSuccess }) {
                 onChange={(e) => setApiKey(e.target.value)}
                 disabled={loading}
               />
-              <p className="text-[8px] font-semibold text-zinc-400 mt-1 select-none tracking-wider uppercase">
-                Enter your sk_ API token from the Sarvam console
+              <p className="text-[8px] font-semibold text-zinc-400 mt-2 tracking-wider uppercase flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                <span>Enter your sk_ API token from the Sarvam console</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApiKey('sk_demo_only');
+                    if (!username.trim()) setUsername('DemoUser');
+                  }}
+                  className="bg-zinc-100 hover:bg-black hover:text-white text-black border border-black px-2 py-0.5 text-[8px] font-bold transition-all select-none self-start sm:self-auto shadow-[1.5px_1.5px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[0.5px] hover:translate-y-[0.5px] uppercase"
+                >
+                  ⚡ Auto-Fill Demo Key
+                </button>
               </p>
             </div>
 
             {error && (
-              <div className="p-3.5 bg-red-50 border border-red-600 text-red-600 text-[10px] text-center font-bold tracking-wider uppercase">
+              <div className="p-3 bg-red-50 border border-red-600 text-red-600 text-[10px] text-center font-bold tracking-wider uppercase">
                 {error}
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full py-3.5 btn-primary text-white flex items-center justify-center gap-2 select-none text-xs font-bold tracking-wider shadow-[3px_3px_0px_var(--accent-red)] hover:shadow-[4px_4px_0px_var(--accent-red)]"
+              className="w-full py-3.5 btn-primary text-white flex items-center justify-center gap-2 text-xs font-bold tracking-wider shadow-[3px_3px_0px_var(--accent-red)] hover:shadow-[4px_4px_0px_var(--accent-red)]"
               disabled={loading}
             >
               {loading ? (
@@ -287,15 +314,82 @@ export default function Login({ onLoginSuccess }) {
                 <span>Initialize Workspace</span>
               )}
             </button>
+
+            {/* Mobile Setup Guide Button */}
+            <button
+              type="button"
+              onClick={() => setShowMobileGuide(true)}
+              className="w-full py-3 btn-secondary text-black text-xs font-bold tracking-wider md:hidden block mt-2"
+            >
+              Setup Guide & Story
+            </button>
           </form>
           
         </div>
         
-        <span className="text-[8px] font-bold text-zinc-400 tracking-widest mt-6 uppercase">
+        <span className="text-[8px] font-bold text-zinc-400 tracking-widest mt-6 uppercase text-center">
           secure credentials &bull; local storage encryption session
         </span>
       </div>
 
+      {/* MOBILE POPUP OVERLAY MODAL */}
+      {showMobileGuide && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-black max-w-md w-full max-h-[85vh] overflow-y-auto p-6 shadow-[5px_5px_0px_0px_var(--accent-red)] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-black pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-black text-lg shadow-[2px_2px_0px_0px_var(--accent-red)] border border-black shrink-0">
+                    M
+                  </div>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-black">Maskali Guide & Story</span>
+                </div>
+                <button
+                  onClick={() => setShowMobileGuide(false)}
+                  className="w-7 h-7 border border-black hover:bg-zinc-100 flex items-center justify-center font-bold text-sm bg-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Story & Instructions */}
+              <div className="space-y-4 text-xs font-medium text-zinc-600 leading-relaxed text-justify mb-6">
+                <h4 className="font-black text-black uppercase tracking-wider text-[10px]">The Story of Maskali</h4>
+                <p>
+                  Once upon a time in ancient courtyards, the trusty messenger pigeon <strong>Maskali</strong> carried messages across kingdoms, bridging massive distances.
+                  Today, this studio gives your silent scripts a clear, natural voice to fly straight to your audience!
+                </p>
+                
+                <div className="h-[1px] bg-zinc-200 my-4" />
+                
+                <h4 className="font-black text-black uppercase tracking-wider text-[10px]">How to Get Your Sarvam API Key</h4>
+                <ol className="list-decimal list-inside space-y-2.5 text-zinc-700 font-semibold normal-case">
+                  <li>
+                    Visit <a href="https://dashboard.sarvam.ai" target="_blank" rel="noreferrer" className="underline font-black text-black">dashboard.sarvam.ai</a> in your browser.
+                  </li>
+                  <li>Register or sign in to your developer dashboard.</li>
+                  <li>Go to the <strong>"API Keys"</strong> section in the navigation menu.</li>
+                  <li>Generate a new token named "sunAI".</li>
+                  <li>Copy and paste it into the login screen to start.</li>
+                </ol>
+
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-600/30 rounded text-amber-800 text-[10px] font-bold uppercase tracking-wider leading-relaxed">
+                  ⚡ Demo Option: Enter API key <span className="underline font-black text-black">sk_demo_only</span> to instantly explore the app UI/tabs without setting up an account.
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowMobileGuide(false)}
+              className="w-full py-3 btn-primary text-white text-xs font-bold uppercase tracking-wider"
+            >
+              Back to Login
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
+
