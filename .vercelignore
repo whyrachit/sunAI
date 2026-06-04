@@ -1,0 +1,13 @@
+node_modules/
+.git/
+.vercel/
+**/__pycache__/
+**/*.pyc
+venv/
+.venv/
+frontend/dist/
+.env
+*.wav
+*.mp3
+*.log
+usage_log.json
