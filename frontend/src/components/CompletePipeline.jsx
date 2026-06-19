@@ -1,137 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-
-// ── Retro 90s Vinyl Record Player Component ──
-function VinylPlayer({ src, filename, label }) {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [currentTime, setCurrentTime] = useState('0:00')
-  const [duration, setDuration] = useState('0:00')
-  const audioRef = useRef(null)
-
-  const togglePlay = () => {
-    if (!audioRef.current) return
-    if (isPlaying) {
-      audioRef.current.pause()
-    } else {
-      audioRef.current.play()
-    }
-  }
-
-  const handleTimeUpdate = () => {
-    if (!audioRef.current) return
-    const cur = audioRef.current.currentTime
-    const dur = audioRef.current.duration || 0
-    setProgress(dur > 0 ? (cur / dur) * 100 : 0)
-    
-    const formatTime = (time) => {
-      if (isNaN(time)) return '0:00'
-      const mins = Math.floor(time / 60)
-      const secs = Math.floor(time % 60)
-      return `${mins}:${secs < 10 ? '0' : ''}${secs}`
-    }
-    setCurrentTime(formatTime(cur))
-  }
-
-  const handleLoadedMetadata = () => {
-    if (!audioRef.current) return
-    const formatTime = (time) => {
-      if (isNaN(time)) return '0:00'
-      const mins = Math.floor(time / 60)
-      const secs = Math.floor(time % 60)
-      return `${mins}:${secs < 10 ? '0' : ''}${secs}`
-    }
-    setDuration(formatTime(audioRef.current.duration))
-  }
-
-  const handleSeek = (e) => {
-    if (!audioRef.current) return
-    const dur = audioRef.current.duration || 0
-    const pct = parseFloat(e.target.value)
-    audioRef.current.currentTime = (pct / 100) * dur
-    setProgress(pct)
-  }
-
-  useEffect(() => {
-    setIsPlaying(false)
-    setProgress(0)
-    setCurrentTime('0:00')
-  }, [src])
-
-  return (
-    <div className="turntable-container select-none">
-      <audio
-        ref={audioRef}
-        src={src}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onEnded={() => setIsPlaying(false)}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-      />
-      
-      {/* Vinyl Deck */}
-      <div className={`turntable-deck ${isPlaying ? 'active-play' : ''}`}>
-        <div className={`vinyl-record ${isPlaying ? 'vinyl-spin' : ''}`}>
-
-          <div className="vinyl-grooves" />
-          <div className="vinyl-grooves-2" />
-          <div className="vinyl-label">
-            <span className="vinyl-brand">sunAI</span>
-            <span className="vinyl-subtext">LP</span>
-          </div>
-          <div className="vinyl-center-spindle" />
-        </div>
-        
-        {/* Tonearm */}
-        <div className={`tonearm ${isPlaying ? 'active' : ''}`}>
-          <div className="tonearm-pivot" />
-          <div className="tonearm-arm" />
-          <div className="tonearm-needle" />
-        </div>
-      </div>
-
-      {/* Info & Controls */}
-      <div className="w-full flex flex-col space-y-3 text-center items-center">
-        <div className="flex flex-col items-center">
-          <span className="text-xs font-black text-black uppercase tracking-wider block max-w-full truncate">{label || filename}</span>
-          <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mt-1">{currentTime} / {duration}</span>
-        </div>
-
-        {/* Progress Bar */}
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="0.1"
-          value={progress}
-          onChange={handleSeek}
-          className="w-full h-1.5 bg-zinc-200 rounded-none appearance-none cursor-pointer accent-black"
-        />
-
-        {/* Action Controls */}
-        <div className="flex items-center justify-center gap-3 w-full">
-          <button
-            onClick={togglePlay}
-            className="px-5 py-2 bg-black hover:bg-zinc-900 text-white text-[9px] font-black uppercase tracking-widest border border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all duration-150 active:translate-x-[1px] active:translate-y-[1px]"
-          >
-            {isPlaying ? 'PAUSE' : 'PLAY'}
-          </button>
-          
-          {src && (
-            <a
-              href={src}
-              download={filename || 'track.mp3'}
-              className="px-4 py-2 bg-white hover:bg-zinc-50 text-black text-[9px] font-black uppercase tracking-widest border border-black shadow-[2px_2px_0px_var(--accent-green)] transition-all duration-150 inline-block"
-            >
-              DOWNLOAD
-            </a>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
+import JSZip from 'jszip'
+import VinylPlayer, { triggerDownload } from './VinylPlayer'
 
 export default function CompletePipeline({ apiKey, workspace, showToast }) {
   const languages = {
@@ -224,26 +94,35 @@ export default function CompletePipeline({ apiKey, workspace, showToast }) {
   const [warnings, setWarnings] = useState([])
   const [audios, setAudios] = useState({})
 
+  // Resolve the shared pronunciation dictionary id for this API key from the
+  // Sarvam cloud (shared across all users on the key); fall back to local cache.
   useEffect(() => {
-    const loadDictionary = () => {
+    let cancelled = false
+    const readLocalDictId = () => {
       try {
         const localData = localStorage.getItem(`sunai_dict_${workspace}`)
-        if (localData) {
-          const parsed = JSON.parse(localData)
-          if (parsed.sarvam_dict_id) {
-            setDictId(parsed.sarvam_dict_id)
-          } else {
-            setDictId(null)
-          }
-        } else {
-          setDictId(null)
-        }
+        const parsed = localData ? JSON.parse(localData) : null
+        return parsed?.sarvam_dict_id || null
       } catch (err) {
         console.error(err)
+        return null
       }
     }
-    loadDictionary()
-  }, [workspace])
+    const resolveDictId = async () => {
+      try {
+        const response = await axios.post('/api/dictionary/load', { apiKey, workspace })
+        if (!cancelled && response.data.success) {
+          setDictId(response.data.dictionary_id || null)
+          return
+        }
+      } catch (err) {
+        console.error('Falling back to cached dict id:', err)
+      }
+      if (!cancelled) setDictId(readLocalDictId())
+    }
+    resolveDictId()
+    return () => { cancelled = true }
+  }, [workspace, apiKey])
 
   useEffect(() => {
     // Load custom prompts from localStorage
@@ -384,18 +263,21 @@ export default function CompletePipeline({ apiKey, workspace, showToast }) {
     document.body.removeChild(element)
   }
 
-  const downloadAllAudios = () => {
+  const downloadAllAudios = async () => {
     const validAudios = Object.entries(audios).filter(([_, r]) => !r.error)
     if (validAudios.length === 0) return
 
-    validAudios.forEach(([label, r]) => {
-      const element = document.createElement("a")
-      element.href = `data:audio/${r.ext};base64,${r.data}`
-      element.download = r.filename
-      document.body.appendChild(element)
-      element.click()
-      document.body.removeChild(element)
-    })
+    try {
+      const zip = new JSZip()
+      validAudios.forEach(([_, r]) => {
+        zip.file(r.filename, r.data, { base64: true })
+      })
+      const blob = await zip.generateAsync({ type: 'blob' })
+      triggerDownload(blob, 'sunai_audio_tracks.zip')
+    } catch (err) {
+      console.error('Failed to build zip archive:', err)
+      showToast('Failed to package tracks into a zip.', 'error')
+    }
   }
 
   return (

@@ -30,25 +30,43 @@ def split_into_pause_segments(
     if not paragraphs:
         return []
 
-    segments: list[tuple[str, int]] = []
+    from tts.chunker import chunk_text
 
-    for i, para in enumerate(paragraphs):
-        is_last_para = i == len(paragraphs) - 1
-        end_pause = 0 if is_last_para else paragraph_pause_ms
+    # Greedily PACK consecutive paragraphs into chunks up to max_chunk_chars.
+    # Without this, every paragraph became its own TTS request — a transcript or
+    # SRT-derived document (one short line per paragraph) would fire hundreds of
+    # sequential API calls, taking many minutes per file. Packing turns that into
+    # a handful of calls. Paragraph boundaries inside a packed chunk are kept as
+    # blank lines so the engine still hears them; explicit silence is inserted
+    # between chunks.
+    chunks: list[str] = []
+    buf: list[str] = []
+    buf_len = 0
 
-        if len(para) <= max_chunk_chars:
-            segments.append((para, end_pause))
-        else:
-            # Paragraph too long — chunk at sentence boundaries
-            from tts.chunker import chunk_text
-            chunks = chunk_text(para, max_chunk_chars)
-            for j, chunk in enumerate(chunks):
-                is_last_chunk = j == len(chunks) - 1
-                # Mid-para chunk boundary gets a shorter pause than paragraph end
-                pause = end_pause if is_last_chunk else 400
-                segments.append((chunk, pause))
+    def _flush():
+        nonlocal buf, buf_len
+        if buf:
+            chunks.append('\n\n'.join(buf))
+            buf = []
+            buf_len = 0
 
-    return segments
+    for para in paragraphs:
+        if len(para) > max_chunk_chars:
+            # A single oversized paragraph: flush what we have, then sentence-chunk it.
+            _flush()
+            chunks.extend(chunk_text(para, max_chunk_chars))
+            continue
+        add_len = len(para) + (2 if buf else 0)
+        if buf and buf_len + add_len > max_chunk_chars:
+            _flush()
+            add_len = len(para)
+        buf.append(para)
+        buf_len += add_len
+
+    _flush()
+
+    # Pause after every chunk except the last.
+    return [(c, paragraph_pause_ms if i < len(chunks) - 1 else 0) for i, c in enumerate(chunks)]
 
 
 def generate_silence_wav(duration_ms: int, sample_rate: int = 24000, channels: int = 1) -> bytes:
@@ -118,8 +136,9 @@ def try_wav_to_mp3(wav_bytes: bytes, bitrate: str = "128k") -> bytes | None:
         encoder = lameenc.Encoder()
         encoder.set_bit_rate(br_val)
         encoder.set_in_sample_rate(sample_rate)
-        encoder.set_num_channels(channels)
-        
+        encoder.set_channels(channels)
+        encoder.set_quality(2)  # 2 = high quality / near-best, recommended default
+
         mp3_bytes = encoder.encode(pcm_data)
         mp3_bytes += encoder.flush()
         if mp3_bytes:

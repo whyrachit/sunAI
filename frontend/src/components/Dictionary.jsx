@@ -32,15 +32,7 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
   const [formWord, setFormWord] = useState('')
   const [formPron, setFormPron] = useState('')
 
-  const [isEditingId, setIsEditingId] = useState(false)
-  const [tempDictId, setTempDictId] = useState('')
-
-  useEffect(() => {
-    setTempDictId(sarvamDictId || '')
-  }, [sarvamDictId])
-
-  const loadDictionary = () => {
-    setLoading(true)
+  const loadFromLocalCache = () => {
     try {
       const localData = localStorage.getItem(`sunai_dict_${workspace}`)
       if (localData) {
@@ -55,7 +47,32 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
       }
     } catch (err) {
       console.error(err)
-      showToast('Could not fetch dictionary from localStorage.', 'error')
+    }
+  }
+
+  // The pronunciation dictionary is shared across everyone using the same Sarvam
+  // API key (Sarvam stores it server-side per key). Load the cloud copy as the
+  // source of truth; fall back to the local cache only if the cloud is offline.
+  const loadDictionary = async () => {
+    setLoading(true)
+    try {
+      const response = await axios.post('/api/dictionary/load', { apiKey, workspace })
+      if (response.data.success) {
+        const cloudEntries = response.data.entries || []
+        const cloudId = response.data.dictionary_id || null
+        setEntries(cloudEntries)
+        setSarvamDictId(cloudId)
+        const synced = cloudEntries.length ? lastSynced : null
+        localStorage.setItem(`sunai_dict_${workspace}`, JSON.stringify({
+          entries: cloudEntries,
+          sarvam_dict_id: cloudId,
+          last_synced: synced
+        }))
+      }
+    } catch (err) {
+      console.error(err)
+      loadFromLocalCache()
+      showToast('Cloud dictionary unavailable — showing local cache.', 'error')
     } finally {
       setLoading(false)
     }
@@ -63,7 +80,7 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
 
   useEffect(() => {
     loadDictionary()
-  }, [workspace])
+  }, [workspace, apiKey])
 
   const handleSaveLocal = (updatedEntries = entries) => {
     try {
@@ -78,24 +95,6 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
       console.error(err)
       showToast('Failed to save entries locally.', 'error')
       return false
-    }
-  }
-
-  const handleUpdateDictId = () => {
-    try {
-      const cleanId = tempDictId.trim() || null
-      const dataToSave = {
-        entries: entries,
-        sarvam_dict_id: cleanId,
-        last_synced: lastSynced
-      }
-      localStorage.setItem(`sunai_dict_${workspace}`, JSON.stringify(dataToSave))
-      setSarvamDictId(cleanId)
-      setIsEditingId(false)
-      showToast('Cloud Dictionary ID updated successfully!', 'success')
-    } catch (err) {
-      console.error(err)
-      showToast('Failed to update Dictionary ID.', 'error')
     }
   }
 
@@ -197,7 +196,8 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
       const response = await axios.post('/api/dictionary/upload', {
         apiKey: apiKey,
         entries: entries,
-        workspace: workspace
+        workspace: workspace,
+        oldDictId: sarvamDictId
       })
 
       if (response.data.success) {
@@ -213,7 +213,7 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
         }
         localStorage.setItem(`sunai_dict_${workspace}`, JSON.stringify(dataToSave))
         
-        showToast(`Dictionary published to cloud successfully!`, 'success')
+        showToast(`Published! This dictionary is now live for everyone using this API key.`, 'success')
       }
     } catch (err) {
       console.error(err)
@@ -286,74 +286,51 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
           Pronunciation <span className="grad-text">Dictionary</span>
         </h2>
         <p className="text-zinc-400 text-xs mt-1 font-bold uppercase tracking-wider">
-          Manage local phonetics guidelines and upload to Sarvam AI cloud database
+          Shared pronunciation rules for everyone using this Sarvam API key
+        </p>
+      </div>
+
+      {/* Shared-scope notice */}
+      <div className="bg-zinc-50 border border-black p-4 shadow-[2px_2px_0px_var(--border-geo)] flex items-start gap-3">
+        <svg className="w-4 h-4 text-black mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider leading-relaxed">
+          This dictionary is stored in the Sarvam cloud and <span className="text-black">shared by everyone who logs in with this API key</span>. Edits are local until you <span className="text-black">Publish</span> — publishing replaces the shared dictionary for all users on this key.
         </p>
       </div>
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white border border-black p-6 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Local Entries Saved</span>
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Dictionary Entries</span>
           <span className="text-3xl font-extrabold text-black mt-2">{entries.length}</span>
         </div>
 
         <div className="bg-white border border-black p-6 flex flex-col justify-between relative shadow-[2px_2px_0px_var(--border-geo)]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Cloud Dictionary ID</span>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Shared Cloud Profile</span>
             {sarvamDictId ? (
-              <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 border border-emerald-300 px-1.5 py-0.5">ACTIVE PROFILE</span>
+              <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 border border-emerald-300 px-1.5 py-0.5">PUBLISHED</span>
             ) : (
-              <span className="text-[8px] font-black text-amber-600 bg-amber-50 border border-amber-300 px-1.5 py-0.5">NO CONFIG YET</span>
+              <span className="text-[8px] font-black text-amber-600 bg-amber-50 border border-amber-300 px-1.5 py-0.5">NOT PUBLISHED</span>
             )}
           </div>
-          
-          {isEditingId ? (
-            <div className="mt-3 flex gap-2">
-              <input
-                type="text"
-                className="form-input py-1 text-xs font-mono"
-                placeholder="e.g. dict_uuid_or_custom_id"
-                value={tempDictId}
-                onChange={(e) => setTempDictId(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={handleUpdateDictId}
-                className="px-3 py-1 bg-black text-white border border-black text-[9px] font-black uppercase tracking-wider"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditingId(false)
-                  setTempDictId(sarvamDictId || '')
-                }}
-                className="px-2.5 py-1 bg-white text-black border border-black text-[9px] font-black uppercase tracking-wider"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <div className="mt-3 flex items-center justify-between gap-3 bg-zinc-50 border border-black px-3 py-1.5">
-              <span className="text-xs font-bold text-black font-mono overflow-x-auto select-all truncate max-w-[70%]">
-                {sarvamDictId ? sarvamDictId : 'No profile active'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsEditingId(true)}
-                className="text-[9px] font-black border border-black px-2.5 py-1 bg-white hover:bg-zinc-100 uppercase tracking-wider"
-              >
-                Customize
-              </button>
-            </div>
-          )}
+
+          <div className="mt-3 flex items-center gap-2 bg-zinc-50 border border-black px-3 py-1.5">
+            <span className="text-xs font-bold text-black font-mono overflow-x-auto select-all truncate">
+              {sarvamDictId ? sarvamDictId : 'Publish to create the shared profile'}
+            </span>
+          </div>
+          <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mt-2 leading-relaxed">
+            Auto-managed — one profile per API key. The ID changes each publish.
+          </span>
         </div>
 
         <div className="bg-white border border-black p-6 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Last Sync Status</span>
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Last Published</span>
           <span className="text-xs font-bold text-zinc-500 mt-2 uppercase">
-            {lastSynced ? `Synced: ${lastSynced}` : 'Never synchronized'}
+            {lastSynced ? lastSynced : 'Not published yet'}
           </span>
         </div>
       </div>
@@ -539,14 +516,14 @@ export default function Dictionary({ username, apiKey, workspace, showToast }) {
             {entries.length > 0 && (
               <div className="pt-6 border-t border-[#1a1a1d] mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <p className="text-[9px] font-bold text-zinc-400 max-w-md uppercase tracking-wider leading-relaxed">
-                  Saving additions/deletions automatically updates your local configuration storage. Click below to publish all local rules directly into your Sarvam TTS dictionary profile in the cloud.
+                  Edits are saved locally as you go. Publishing replaces the shared cloud dictionary for this API key — every user on the key will use these rules after you publish.
                 </p>
                 <button
                   onClick={handleUploadCloud}
                   className="py-3.5 px-8 btn-primary text-white text-xs whitespace-nowrap"
                   disabled={syncing}
                 >
-                  {syncing ? 'Syncing to Sarvam AI Cloud...' : 'Publish Dictionary to Cloud'}
+                  {syncing ? 'Publishing to shared cloud...' : 'Publish to Shared Cloud'}
                 </button>
               </div>
             )}

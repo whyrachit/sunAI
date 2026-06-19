@@ -58,6 +58,26 @@ def _entries_to_sarvam_format(entries: list[dict]) -> dict:
     return result
 
 
+def _sarvam_format_to_entries(pronunciations: dict) -> list[dict]:
+    """Inverse of _entries_to_sarvam_format: {lang: {word: pron}} -> flat entries."""
+    entries: list[dict] = []
+    for lang, words in (pronunciations or {}).items():
+        if not isinstance(words, dict):
+            continue
+        for word, pron in words.items():
+            entries.append({"language": lang, "word": word, "pronunciation": pron})
+    return entries
+
+
+def _dict_id_of(item) -> Optional[str]:
+    """list_pronunciation_dicts may return bare id strings or objects."""
+    if isinstance(item, str):
+        return item
+    if isinstance(item, dict):
+        return item.get("dictionary_id") or item.get("id") or item.get("dict_id")
+    return None
+
+
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
@@ -129,6 +149,12 @@ class UpdateDictIdRequest(BaseModel):
 class DictionaryUploadRequest(BaseModel):
     apiKey: str
     entries: List[DictionaryEntry]
+    workspace: Optional[str] = "Default Workspace"
+    oldDictId: Optional[str] = None
+
+
+class DictionaryLoadRequest(BaseModel):
+    apiKey: str
     workspace: Optional[str] = "Default Workspace"
 
 
@@ -257,9 +283,14 @@ async def api_convert_speech(req: SpeechRequest):
     }
 
     results = {}
-    
-    # Check if the content is in SRT formatting
-    is_srt = req.filename.lower().endswith(".srt") or req.text.strip().startswith("1\n00:")
+
+    # Detect SRT by CONTENT, not filename. A .srt uploaded via /api/parse-file has
+    # already had its timestamps stripped, so a filename check would wrongly route
+    # plain text through the SRT parser (which then finds no timestamps and yields
+    # zero segments → "empty script" error). Content detection is correct for both
+    # stripped uploads (treated as plain text) and raw pasted SRT.
+    from tts.srt_parser import looks_like_srt
+    is_srt = looks_like_srt(req.text)
     username = os.getenv("APP_USERNAME", "ATC")
     
     for speaker_label in req.speakers:
@@ -409,7 +440,8 @@ async def api_run_pipeline(req: PipelineRequest):
     }
 
     results = {}
-    is_srt = req.filename.lower().endswith(".srt") or cleaned.strip().startswith("1\n00:")
+    from tts.srt_parser import looks_like_srt
+    is_srt = looks_like_srt(cleaned)
 
     for speaker_label in req.speakers:
         spk_code = VOICES_MAP.get(speaker_label, "shubh")
@@ -502,6 +534,46 @@ async def api_get_dictionary(workspace: Optional[str] = None):
     return {"entries": [], "sarvam_dict_id": None, "last_synced": None}
 
 
+@app.post("/api/dictionary/load")
+async def api_load_dictionary(req: DictionaryLoadRequest):
+    """Load the shared pronunciation dictionary for this API key from the Sarvam
+    cloud. Because Sarvam stores dictionaries per API key, every user on the same
+    key sees the same entries (one shared dict per key). Falls back gracefully if
+    the key is the demo placeholder."""
+    if req.apiKey.strip() == "sk_demo_only":
+        return {"success": True, "entries": [], "dictionary_id": None}
+
+    tts = SarvamTTS(req.apiKey)
+    try:
+        items = tts.list_pronunciation_dicts()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load cloud dictionary: {e}")
+
+    # Merge every dict on the key into one entry set (normally there is exactly
+    # one; merging makes legacy multi-dict accounts converge without data loss).
+    merged: dict[str, dict] = {}
+    canonical_id = None
+    for item in items:
+        dict_id = _dict_id_of(item)
+        if not dict_id:
+            continue
+        canonical_id = dict_id
+        try:
+            data = tts.get_pronunciation_dict(dict_id)
+            prons = data.get("pronunciations", {}) if isinstance(data, dict) else {}
+            for lang, words in (prons or {}).items():
+                if isinstance(words, dict):
+                    merged.setdefault(lang, {}).update(words)
+        except Exception:
+            continue
+
+    return {
+        "success": True,
+        "entries": _sarvam_format_to_entries(merged),
+        "dictionary_id": canonical_id,
+    }
+
+
 @app.post("/api/dictionary/save")
 async def api_save_dictionary(req: DictionarySaveRequest):
     """Save dictionary entries (Stateless Mock)."""
@@ -528,6 +600,24 @@ async def api_upload_dictionary(req: DictionaryUploadRequest):
     
     pronunciations = _entries_to_sarvam_format(entries)
     tts = SarvamTTS(req.apiKey)
+
+    # One shared dictionary per API key. Delete every existing dict on the key,
+    # then create a single canonical one. This (a) keeps everyone on the key in
+    # sync, and (b) prevents the per-account cap from filling up — which it did
+    # previously because each upload created a brand-new dict. Deleting all
+    # (rather than just a caller-supplied old id) is what makes this correct when
+    # multiple users share the key: whoever uploads last leaves exactly one dict.
+    try:
+        for item in tts.list_pronunciation_dicts():
+            existing_id = _dict_id_of(item)
+            if existing_id:
+                try:
+                    tts.delete_pronunciation_dict(existing_id)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     try:
         dict_id = tts.create_pronunciation_dict(pronunciations)
         last_synced = datetime.now().strftime("%Y-%m-%d %H:%M")

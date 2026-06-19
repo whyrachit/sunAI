@@ -60,7 +60,24 @@ class SarvamTTS:
         if dict_id:
             payload["dict_id"] = dict_id
         try:
-            response = requests.post(url, headers=headers, json=payload)
+            # Retry transient failures (network errors, rate limits, 5xx) so a
+            # single blip mid-document doesn't discard a whole multi-chunk file.
+            import time as _time
+            response = None
+            last_exc = None
+            for attempt in range(3):
+                try:
+                    response = requests.post(url, headers=headers, json=payload, timeout=120)
+                    if response.status_code == 429 or response.status_code >= 500:
+                        last_exc = SarvamTTSError(f"{response.status_code}: {response.text[:200]}")
+                        _time.sleep(1.5 * (attempt + 1))
+                        continue
+                    break
+                except requests.exceptions.RequestException as net_err:
+                    last_exc = net_err
+                    _time.sleep(1.5 * (attempt + 1))
+            if response is None:
+                raise last_exc or SarvamTTSError("TTS request failed after retries")
             response.raise_for_status()
             data = response.json()
             combined = "".join(data["audios"])
@@ -155,7 +172,15 @@ class SarvamTTS:
             "file": ("pronunciations.json", payload, "application/json")
         }
         response = requests.post(url, headers=headers, files=files)
-        response.raise_for_status()
+        if not response.ok:
+            # Surface Sarvam's actual reason (e.g. "Dictionary limit exceeded")
+            # instead of a bare "400 Bad Request".
+            try:
+                body = response.json()
+                detail = body.get("detail") or body.get("error", {}).get("message") or response.text
+            except Exception:
+                detail = response.text
+            raise SarvamTTSError(f"{response.status_code}: {detail}")
         data = response.json()
         return data.get("dictionary_id") or data.get("id") or data.get("dict_id")
 
@@ -185,12 +210,14 @@ class SarvamTTS:
         return response.json()
 
     def delete_pronunciation_dict(self, dict_id: str) -> None:
+        # Sarvam deletes via the collection URL with a `dict_id` query param;
+        # DELETE on /{dict_id} returns 405 Method Not Allowed.
         import requests
-        url = f"https://api.sarvam.ai/text-to-speech/pronunciation-dictionary/{dict_id}"
+        url = "https://api.sarvam.ai/text-to-speech/pronunciation-dictionary"
         headers = {
             "api-subscription-key": self.api_key
         }
-        response = requests.delete(url, headers=headers)
+        response = requests.delete(url, headers=headers, params={"dict_id": dict_id})
         response.raise_for_status()
 
     def run_chat_completion(self, messages: list, model: str = "sarvam-105b", feature: str = "LLM Script Processing", user: str = "ATC", workspace: str = "Default Workspace") -> str:
